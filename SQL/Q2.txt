@@ -1,0 +1,49 @@
+SET search_path TO bnb, public;
+
+CREATE OR REPLACE VIEW numRequests AS
+SELECT Traveler.travelerId, count(requestId) AS numRequests
+FROM Traveler, BookingRequest
+WHERE Traveler.travelerId = BookingRequest.travelerId
+GROUP BY Traveler.travelerId
+ORDER BY numRequests DESC;
+
+CREATE OR REPLACE VIEW Average AS
+SELECT sum(numRequests)/count(travelerId) AS average
+FROM numRequests;
+
+CREATE OR REPLACE VIEW numRequestsSelected AS
+SELECT travelerId, numRequests
+FROM numRequests, Average
+WHERE numRequests >= average + 10;
+
+CREATE OR REPLACE VIEW BookingCity AS
+SELECT requestId, travelerId, Listing.listingId, city
+FROM BookingRequest, Listing
+WHERE Listing.listingId = BookingRequest.listingId;
+
+CREATE OR REPLACE VIEW RequestedCity AS
+SELECT travelerId, city, count(city) AS RequestedCity
+FROM BookingCity
+GROUP BY travelerId, city;
+
+CREATE OR REPLACE VIEW NotRequestedCity AS
+SELECT r1.travelerId, r1.city, r1.RequestedCity
+FROM RequestedCity r1, RequestedCity r2
+WHERE r1.travelerId = r2.travelerId AND r1.requestedCity < r2.requestedCity;
+
+CREATE OR REPLACE VIEW IsRequestedCity AS
+(SELECT * FROM RequestedCity) EXCEPT (SELECT * FROM NotRequestedCity);
+
+CREATE OR REPLACE VIEW FinalRequestedCity AS
+SELECT travelerId, city
+FROM IsRequestedCity;
+
+CREATE OR REPLACE VIEW scraper AS
+SELECT numRequestsSelected.travelerId, numRequests, city AS mostRequestedCity
+FROM numRequestsSelected, FinalRequestedCity
+WHERE numRequestsSelected.travelerId = FinalRequestedCity.travelerId;
+
+SELECT scraper.travelerId, concat(firstname,' ', surname) AS name, email, mostRequestedCity, numrequests
+FROM scraper, Traveler
+WHERE scraper.travelerId = Traveler.travelerId
+ORDER BY numRequests DESC, scraper.travelerId;

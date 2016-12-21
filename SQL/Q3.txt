@@ -1,0 +1,48 @@
+SET search_path TO bnb, public;
+
+
+CREATE OR REPLACE VIEW NotValidate AS
+SELECT b1.listingId, b1.startdate, b1.numNights
+FROM Booking b1, Booking b2
+WHERE b1.listingId=b2.listingId AND b1.startdate < b2.startdate AND b1.startdate+b1.numNights>b2.startdate;
+
+
+CREATE OR REPLACE VIEW ValidateBooking AS
+(SELECT DISTINCT listingId, startdate, numNights
+FROM Booking)
+EXCEPT
+(SELECT DISTINCT listingId, startdate, numNights
+FROM NotValidate);
+
+
+CREATE OR REPLACE VIEW BookListing AS
+SELECT owner, ValidateBooking.listingId, propertyType, city, EXTRACT(YEAR FROM startdate) AS year, numNights
+FROM ValidateBooking, Listing
+WHERE ValidateBooking.listingId = Listing.listingId;
+ 
+CREATE OR REPLACE VIEW Min AS
+SELECT owner AS homeowner, listingId, CAST(year AS integer), BookListing.city
+FROM BookListing, CityRegulation
+WHERE BookListing.city = CityRegulation.city AND 
+(BookListing.propertyType = CityRegulation.propertyType or CityRegulation.propertyType = NULL) AND 
+regulationType = 'min' AND numNights<days;
+
+CREATE OR REPLACE VIEW BookListingYear AS
+SELECT owner, listingId, propertyType, city, year, sum(numNights) as yearCount
+FROM BookListing
+GROUP BY owner, listingId, propertyType, city, year;
+
+CREATE OR REPLACE VIEW Max AS
+SELECT owner AS homeowner, listingId, CAST(year AS integer), BookListingYear.city
+FROM BookListingYear, CityRegulation
+WHERE BookListingYear.city = CityRegulation.city AND 
+(BookListingYear.propertyType = CityRegulation.propertyType or CityRegulation.propertyType = NULL) AND 
+regulationType = 'max' AND yearCount>days;
+
+
+(SELECT *
+FROM Min)
+Union
+(SELECT *
+FROM Max);
+

@@ -1,0 +1,35 @@
+ SET search_path TO bnb, public;
+ 
+ --SELECT owner and average score for every year
+ CREATE OR REPLACE VIEW HomeownerRate AS
+ SELECT owner, EXTRACT(YEAR FROM startdate) AS year, AVG(rating) AS average
+ FROM Listing, TravelerRating
+ WHERE Listing.listingId = TravelerRating.listingId
+ GROUP BY owner, year;
+ 
+ --select owner whose score is decreasing
+ CREATE OR REPLACE VIEW Decrease AS
+ SELECT h1.owner, h1.year, h1.average
+ FROM HomeownerRate h1, HomeownerRate h2
+ WHERE h1.owner = h2.owner AND h1.year < h2.year AND h1.average > h2.average;
+
+ --select owner whose score is increasing
+ CREATE OR REPLACE VIEW Increase AS
+ (SELECT DISTINCT owner
+ FROM HomeownerRate)
+ EXCEPT
+ (SELECT DISTINCT owner
+ FROM Decrease);
+ 
+ --count number of increaseHomeowner
+ CREATE OR REPLACE VIEW IncreaseHomeowner AS
+ SELECT count(owner) AS count1
+ FROM Increase;
+ 
+ --count number of total owner
+ CREATE OR REPLACE VIEW TotalActivate AS
+ SELECT count(Distinct owner) AS count2
+ FROM HomeownerRate;
+ 
+ SELECT CAST(round(count1 * 1.0/count2*100, 0) AS integer) AS percentage
+ FROM IncreaseHomeowner, TotalActivate;

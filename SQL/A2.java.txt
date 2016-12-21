@@ -1,0 +1,247 @@
+import java.sql.*;
+import java.util.Date;
+import java.util.Map.Entry;
+// If you are looking for Java data structures, these are highly useful.
+// Remember that an important part of your mark is for doing as much in SQL (not Java) as you can.
+// Solutions that use only or mostly Java will not received a high mark.  
+import java.util.*; 
+import java.text.*;
+public class Assignment2 {
+
+   // A connection to the database
+   Connection connection;
+
+   Assignment2() throws SQLException {
+      try {
+         Class.forName("org.postgresql.Driver");
+      } catch (ClassNotFoundException e) {
+         e.printStackTrace();
+      }
+   }
+
+  /**
+   * Connects and sets the search path.
+   *
+   * Establishes a connection to be used for this session, assigning it to
+   * the instance variable 'connection'.  In addition, sets the search
+   * path to bnb.
+   *
+   * @param  url       the url for the database
+   * @param  username  the username to connect to the database
+   * @param  password  the password to connect to the database
+   * @return           true if connecting is successful, false otherwise
+   */
+   public boolean connectDB(String URL, String username, String password) {
+      // Implement this method!
+      try{connection = DriverManager.getConnection(URL,username,password);
+	String set= "SET search_path To bnb ";
+	Statement temp = connection.createStatement();
+	temp.execute(set);
+	temp.close();
+	return true;
+	} catch(Exception e){
+		return false;
+	}
+   }
+
+  /**
+   * Closes the database connection.
+   *
+   * @return true if the closing was successful, false otherwise
+   */
+   public boolean disconnectDB() {
+      // Implement this method!
+	try{
+	connection.close();
+	if(connection.isClosed()){
+		return true;}else{
+		return false;}
+	
+	}catch(Exception e){
+	return false;
+	}
+   }
+
+   /**
+    * Returns the 10 most similar homeowners based on traveller reviews. 
+    *
+    * Does so by using Cosine Similarity: the dot product between the columns
+    * representing different homeowners. If there is a tie for the 10th 
+    * homeowner (only the 10th), more than 10 records may be returned. 
+    *
+    * @param  homeownerID   id of the homeowner
+    * @return               a list of the 10 most similar homeowners
+    */
+       public ArrayList<Integer> homeownerRecommendation(int homeownerID) {
+	      // Implement this method!
+	      
+	      try {
+	         Statement st = connection.createStatement();
+	         st.executeUpdate("CREATE OR REPLACE VIEW travelerOwner AS "+
+	    	 		 "SELECT Booking.travelerID, Listing.owner, Booking.listingId, startdate "+
+	    			 "FROM Booking FULL JOIN Listing "+
+	    			 "ON Booking.listingId = Listing.listingId;");
+	    	 st.executeUpdate("CREATE OR REPLACE VIEW withRate AS "+
+	    	 		 "SELECT travelerID, owner, rating "+
+	    			 "FROM travelerOwner FULL JOIN TravelerRating "+
+	    			 "ON (travelerOwner.listingID = TravelerRating.listingID) AND (travelerOwner.startdate = TravelerRating.startDate);");
+	    	 ResultSet rs = st.executeQuery("SELECT travelerID, owner, AVG(rating) " +
+	    			 		"FROM withRate "+
+	    			 		"GROUP BY travelerID, owner;");
+		 HashMap<Integer, HashMap<Integer , Float>> hmap = new HashMap<Integer, HashMap<Integer, Float>>();
+		 while(rs.next()){
+		 	int owner = rs.getInt("owner");
+		 	int travelerID = rs.getInt("travelerID");
+			float avg = rs.getFloat("avg");
+		 	if(!hmap.containsKey(owner)){
+				HashMap<Integer, Float> temp = new HashMap<Integer, Float>();
+				temp.put(travelerID, avg);
+				hmap.put(owner,temp);
+			}else{
+				hmap.get(owner).put(travelerID, avg);
+				}
+		     }
+		 rs.close();
+		 st.close();
+		 HashMap<Integer,Float> homeowner = hmap.get(homeownerID);
+		 ArrayList<Integer> travelerId = new ArrayList<Integer>();
+		 Set<Integer> tidSet = hmap.get(homeownerID).keySet();
+		 if(homeowner == null){return null;}
+		 for (int t : tidSet){
+			 travelerId.add(t);	 
+		 }
+		 HashMap<Float,ArrayList<Integer>> htos = new HashMap<Float,ArrayList<Integer>>();
+		 for(int temp:hmap.keySet()){
+			 if(temp != homeownerID){
+				 float sim = similarity(hmap.get(temp),homeowner,tidSet);
+				 if(sim>0){
+					 if(!htos.containsKey(sim)){
+						 ArrayList<Integer> t = new ArrayList<Integer>();
+						 t.add(temp);
+						 htos.put(sim ,t);
+					 }else{
+						 htos.get(sim).add(temp);
+					 }
+					 
+				 }
+			 }
+		 }
+		 Set<Float> simSet = htos.keySet();
+		 ArrayList<Float> wsort = new ArrayList<Float>();
+		 for(Float temp:simSet){
+			 wsort.add(temp);
+		 }
+		 Collections.sort(wsort);
+		 ArrayList<Integer> result = new ArrayList<Integer>();
+		 if(wsort.size() < 10 ){
+			 for(int i=wsort.size()-1;i>-1;i--){
+				 if(htos.get(wsort.get(i)).size() == 1){
+					 result.add(htos.get(wsort.get(i)).get(0));
+				 }
+				 else{
+					 ArrayList<Integer> temp = htos.get(wsort.get(i));
+					 Collections.sort(temp);
+					 for(Integer t:temp){
+						 result.add(t);
+					 }
+				 }
+			 }
+		 }else{
+			 for(int i=wsort.size()-1;i>wsort.size()-11;i--){
+				 if(htos.get(wsort.get(i)).size() == 1){
+					 result.add(htos.get(wsort.get(i)).get(0));
+				 }
+				 else{
+					 ArrayList<Integer> temp = htos.get(wsort.get(i));
+					 Collections.sort(temp);
+					 for(Integer t:temp){
+						 result.add(t);
+					 }
+				 }
+			 }
+		 }
+		 return result;
+		 
+	         } catch (Exception e) {
+		 System.out.println("wrong");
+	         return null;
+	      }
+	   }
+  public float similarity(HashMap<Integer,Float> a,HashMap<Integer,Float> b,Set<Integer> c){
+   	if(a.size() != b.size()|| a.size()!= c.size()){
+		System.out.println("Something wrong with size of input.");
+	}
+	float sum =0;
+	for(Integer tid : c){
+		if(b.get(tid)==null || a.get(tid)==null){
+			System.out.println("Something wrong with id of hashmap.");
+		}
+		sum += a.get(tid)*b.get(tid);	
+	}
+	return sum;
+   
+   }
+   /**
+   /**
+    * Records the fact that a booking request has been accepted by a 
+    * homeowner. 
+    *
+    * If a booking request was made and the corresponding booking has not been
+    * recorded, records it by adding a row to the Booking table, and returns 
+    * true. Otherwise, returns false. 
+    *
+    * @param  requestID  id of the booking request
+    * @param  start      start date for the booking
+    * @param  numNights  number of nights booked
+    * @param  price      amount paid to the homeowner
+    * @return            true if the operation was successful, false otherwise
+    */
+   public boolean booking(int requestId, Date start, int numNights, int price) {
+      // Implement this method!
+      try {
+         PreparedStatement st = connection.prepareStatement("SELECT * FROM BookingRequest WHERE requestId = ?");
+         st.setInt(1,requestId);
+         ResultSet rs = st.executeQuery();
+	 if(!rs.next()){
+		st.close();
+		System.out.println("1");
+		return false;}
+	 int listingId = rs.getInt("listingid");
+         int travelerId = rs.getInt("travelerid");
+         int numGuests =rs.getInt("numguests");
+	 st = connection.prepareStatement("SELECT * FROM Booking,BookingRequest WHERE requestId = ? AND Booking.listingId = " +
+	 "BookingRequest.listingId AND (BookingRequest.startdate+BookingRequest.numNights <= Booking.startdate OR BookingRequest.startdate >= "+
+	 "Booking.startdate +Booking.numNights);");
+	 st.setInt(1,requestId);
+	 rs = st.executeQuery();
+	 if(rs.next()){
+		st.close();
+		return false;
+		}else{
+		st =connection.prepareStatement("INSERT INTO Booking "+"VALUES (?,?,?,?,?,?)");
+		st.setInt(1,listingId);
+		st.setDate(2,new java.sql.Date(start.getTime()));
+		st.setInt(3,travelerId);
+		st.setInt(4,numNights);
+		st.setInt(5,numGuests);
+		st.setInt(6,price);
+		st.executeUpdate();
+		st.close();
+		return  true;
+	              }
+
+         } catch (Exception e) {
+         return false;
+      }
+
+   }
+
+
+
+   public static void main(String[] args) {
+      // You can put testing code in here. It will not affect our autotester.
+      System.out.println("Boo!");
+     
+   }
+
+}

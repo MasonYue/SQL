@@ -1,0 +1,74 @@
+SET search_path TO bnb, public;
+
+--combine owner and listingId with rating
+CREATE OR REPLACE VIEW rating AS
+SELECT Listing.owner, Listing.listingId, rating
+FROM Listing LEFT JOIN TravelerRating
+ON Listing.listingId = TravelerRating.listingID;
+
+--combine owner and rate five
+CREATE OR REPLACE VIEW five AS
+SELECT owner, count(rating) AS r5
+FROM rating
+WHERE rating = 5
+GROUP BY owner;
+
+--combine owner and rate four
+CREATE OR REPLACE VIEW four AS
+SELECT owner,count(rating) AS r4
+FROM rating
+WHERE rating = 4
+GROUP BY owner;
+
+--combine owner and rate three
+CREATE OR REPLACE VIEW three AS
+SELECT owner, count(rating) AS r3
+FROM rating
+WHERE rating = 3
+GROUP BY owner;
+
+--combine owner and rate two
+CREATE OR REPLACE VIEW two AS
+SELECT owner, count(rating) AS r2
+FROM rating
+WHERE rating = 2
+GROUP BY owner;
+
+--combine owner and rate one
+CREATE OR REPLACE VIEW one AS
+SELECT owner, count(rating) AS r1
+FROM rating
+WHERE rating = 1
+GROUP BY owner;
+
+--let five join rating to get every owner's info
+CREATE OR REPLACE VIEW five_ AS
+SELECT DISTINCT rating.owner AS homeownerID, r5
+FROM rating LEFT JOIN five
+ON rating.owner = five.owner;
+
+--every owner with rate five and four
+CREATE OR REPLACE VIEW five_4 AS
+SELECT homeownerID, r5, r4
+FROM five_ LEFT JOIN four
+ON five_.homeownerID = four.owner;
+
+--every owner with rate five, four, three
+CREATE OR REPLACE VIEW five_43 AS
+SELECT homeownerID, r5, r4, r3
+FROM five_4 LEFT JOIN three
+ON five_4.homeownerID = three.owner;
+
+--every owner with rate five, four, three, two
+CREATE OR REPLACE VIEW five_432 AS
+SELECT homeownerID, r5, r4, r3, r2
+FROM five_43 LEFT JOIN two
+ON five_43.homeownerID = two.owner;
+
+--every owner with rate five, four, three, two, one
+SELECT homeownerID, r5, r4, r3,r2,r1
+FROM five_432 LEFT JOIN one
+ON five_432.homeownerID = one.owner
+ORDER BY r5 DESC, r4 DESC, r3 DESC, r2 DESC,r1 DESC, homeownerID;
+
+

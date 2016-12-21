@@ -1,0 +1,45 @@
+ SET search_path TO bnb, public;
+ 
+ --Combine travelerId and listingId she/he requested
+ CREATE OR REPLACE VIEW travelerRequest AS
+ SELECT DISTINCT travelerId, listingId
+ FROM BookingRequest;
+ 
+ --Select travelerID and listingId she/he requested
+ CREATE OR REPLACE VIEW travelerBooking AS
+ SELECT DISTINCT travelerID, listingId
+ FROM Booking;
+ 
+ --Delete those travelerID who haven't book every request
+ CREATE OR REPLACE VIEW NotCommited AS
+ (SELECT travelerId, listingId
+ FROM travelerRequest)
+ EXCEPT
+ (SELECT travelerId, listingId
+ FROM travelerBooking);
+ 
+ --Commited Traveler
+ CREATE OR REPLACE VIEW Commited AS
+ (SELECT DISTINCT travelerId
+ FROM travelerRequest)
+ EXCEPT
+ (SELECT DISTINCT travelerId
+ FROM NotCommited);
+ 
+ --Calculate total of distinct listingId he/she booked
+ CREATE OR REPLACE VIEW CommitedTraveler AS
+ SELECT Commited.travelerId, COUNT(Distinct Booking.listingId) AS numListings
+ FROM Commited, Booking
+ WHERE Commited.travelerId = Booking.travelerId
+ GROUP BY Commited.travelerId;
+ 
+ SELECT CommitedTraveler.travelerId, surname, numListings
+ FROM CommitedTraveler, Traveler
+ WHERE CommitedTraveler.travelerId = Traveler.travelerId
+ ORDER BY CommitedTraveler.travelerId;
+ 
+ 
+
+	
+ 
+ 

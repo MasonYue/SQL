@@ -1,0 +1,21 @@
+ SET search_path TO bnb, public;
+ 
+ --find average price for every listing
+ CREATE OR REPLACE VIEW averageListing AS
+ SELECT listingId, SUM(price)/SUM(numNights) AS average
+ FROM Booking
+ GROUP BY listingId;
+ 
+ -- find bargain for every traveler for every listing
+ CREATE OR REPLACE VIEW bargainPrice AS
+ SELECT travelerID, count(price) AS count, 100*(average-price)/average AS BargainPercentage, averageListing.listingId
+ FROM averageListing, Booking
+ WHERE averageListing.listingId = Booking.listingId AND price <= 0.75*average
+ GROUP BY travelerID, BargainPercentage, averageListing.listingId; 
+ 
+
+ -- find maximum bargain for each traveler
+ SELECT travelerID, MAX(BargainPercentage) AS largestBargainPercentage, listingId
+ FROM bargainPrice
+ GROUP BY travelerID, listingId
+ ORDER BY largestBargainPercentage DESC, travelerID, listingId;

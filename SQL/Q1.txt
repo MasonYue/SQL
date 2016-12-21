@@ -1,0 +1,37 @@
+ SET search_path TO bnb, public;
+ 
+ CREATE OR REPLACE VIEW travelerRequest AS
+ SELECT  Traveler.travelerId, EXTRACT(YEAR FROM startdate) AS year, requestId
+ FROM Traveler LEFT JOIN BookingRequest
+ ON (Traveler.travelerId = BookingRequest.travelerId);
+
+ CREATE OR REPLACE VIEW travelerBooking AS
+ SELECT  Traveler.travelerId, EXTRACT(YEAR FROM startdate) AS year, listingId
+ FROM Traveler LEFT JOIN Booking
+ ON (Traveler.travelerId = Booking.travelerId);
+ 
+ CREATE OR REPLACE VIEW travelerRequestCount AS
+ SELECT  travelerId, year, count(requestId) AS numRequests
+ FROM travelerRequest
+ WHERE year >= '2006'
+ GROUP BY travelerId, year
+ ORDER BY year DESC;
+
+ CREATE OR REPLACE VIEW travelerBookingCount AS
+ SELECT travelerId, year, count(listingId) AS numBooking
+ FROM travelerBooking
+ WHERE year >= '2006'
+ GROUP BY travelerId, year
+ ORDER BY year DESC;
+ 
+ CREATE OR REPLACE VIEW travelerCount AS
+ SELECT travelerRequestCount.travelerId, travelerRequestCount.year, numRequests, numBooking
+ FROM travelerRequestCount FULL JOIN travelerBookingCount
+ ON (travelerRequestCount.travelerId = travelerBookingCount.travelerId AND
+ 	  travelerRequestCount.year = travelerBookingCount.year );
+ 
+ 
+ SELECT  Traveler.travelerId, email, CAST(year AS integer), coalesce(numRequests,0) AS numrequests, coalesce(numBooking,0) AS numbooking
+ FROM travelerCount RIGHT JOIN Traveler
+ ON travelerCount.travelerId = Traveler.travelerId
+ ORDER BY year DESC, travelerId;

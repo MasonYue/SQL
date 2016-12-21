@@ -1,0 +1,51 @@
+ SET search_path TO bnb, public;
+ 
+ --Combine HomeownerRating and TravelerRating with listingID and startDate
+ CREATE OR REPLACE VIEW Reciprocals AS
+ SELECT HomeownerRating.listingID, HomeownerRating.rating AS hStars, TravelerRating.rating AS tStars, HomeownerRating.startDate
+ FROM HomeownerRating, TravelerRating
+ WHERE HomeownerRating.listingID = TravelerRating.listingID AND HomeownerRating.startDate = TravelerRating.startDate;
+ 
+--add travelerID to Reciprocals
+ CREATE OR REPLACE VIEW ReciprocalsWithTravelerID AS
+ SELECT b.travelerID, r.listingID, r.hStars, r.tStars
+ FROM Booking b, Reciprocals r
+ WHERE b.listingID = r.listingID AND b.startdate = r.startDate;
+ 
+
+--get all travelers with corresponding listingID
+ CREATE OR REPLACE VIEW AllTravelers AS
+ SELECT t.travelerId, listingId
+ FROM Traveler t LEFT JOIN Booking b
+ ON t.travelerId = b.travelerID;
+ 
+--count number of listingID for every traveler to get number of Reciprocals
+ CREATE OR REPLACE VIEW NumReciprocals AS
+ SELECT a.travelerID, count(r.listingID) AS reciprocals
+ FROM ReciprocalsWithTravelerID r RIGHT JOIN AllTravelers a
+ ON (r.listingID = a.listingID) AND (r.travelerID = a.travelerID)
+ GROUP BY a.travelerID;
+  
+ --get listingID and startDate
+ CREATE OR REPLACE VIEW backScratches AS
+ SELECT listingID, startDate
+ FROM Reciprocals
+ WHERE hStars - tStars <= 1 AND hStars - tStars >= -1;
+
+--add travelerID to backScratches
+ CREATE OR REPLACE VIEW backScratchesWithTravelerID AS
+ SELECT b.travelerID, r.listingID
+ FROM Booking b, backScratches r
+ WHERE b.listingID = r.listingID AND b.startdate = r.startDate;
+
+--count back scratches
+ CREATE OR REPLACE VIEW numBackScratches AS
+ SELECT a.travelerID, count(b.listingID) AS backScratches
+ FROM AllTravelers a LEFT JOIN backScratchesWithTravelerID b
+ ON (a.listingID = b.listingID) AND (a.travelerID = b.travelerID)
+ GROUP BY a.travelerID;
+
+ SELECT NumReciprocals.travelerID, reciprocals, backScratches
+ FROM NumReciprocals, numBackScratches
+ WHERE NumReciprocals.travelerID = numBackScratches.travelerID
+ ORDER BY reciprocals DESC, backScratches DESC;
