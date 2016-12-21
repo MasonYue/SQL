@@ -1,0 +1,119 @@
+DROP SCHEMA IF EXISTS closets CASCADE;
+CREATE SCHEMA closets;
+SET SEARCH_PATH TO closets;
+
+CREATE TABLE Employee (
+eid INT PRIMARY KEY,
+name varchar(40) not null
+);
+
+CREATE TABLE Department (
+departId INT PRIMARY KEY,
+name varchar(40) not null,
+upperDepartment varchar(10),
+manager int references Employee(eid) on delete restrict on update cascade
+);
+
+CREATE TABLE Part (
+partId INT PRIMARY KEY,
+description varchar(40) not null
+);
+
+CREATE TABLE PartBOM (
+quantity INT,
+location varchar(40),
+partB int references Part(partId),
+subpart int references Part(partId),
+primary key(partB,subpart)
+);
+
+CREATE TABLE ProductLine (
+code2 INT primary key
+);
+
+CREATE TABLE Product (
+productId INT UNIQUE,
+name varchar(40) not null,
+description varchar(40),
+price INT,
+TotalQuantity INT,
+ReorderPoint INT,
+code int unique references ProductLine(code2) on update cascade,
+primary key(productId,code)
+);
+
+CREATE TABLE BOM (
+quantity INT NOT NULL,
+location varchar(40) NOT NULL,
+partc int references Part(partId) on update cascade,
+productId INT references Product(productId) on update cascade,
+productLineCode INT references Product(code) on update cascade,
+primary key(partc,productId,productLineCode)
+);
+
+CREATE TABLE WorkCenter (
+workCenterId INT PRIMARY KEY,
+capacity INT,
+name varchar(40)
+);
+
+CREATE TABLE Operations (
+oid INT unique,
+Description varchar(40) not null,
+stdOperationTime time,
+SetupTime time,
+productb INT references Product(productId) on update cascade,
+code INT references Product(code) on update cascade,
+workcenter INT references Workcenter(workCenterId) on update cascade,
+primary key(oid,productb,code)
+);
+
+CREATE TABLE Producedby (
+productc INT references Product(productId) on update cascade,
+code INT references Product(code) on update cascade,
+operations INT references Operations(oid) on update cascade,
+primary key(productc, code, operations)
+);
+
+CREATE TABLE ProductionOrder (
+pId INT PRIMARY KEY,
+quantity INT,
+EstimatedDate date,
+product INT references Product(productId) on update cascade,
+code INT references Product(code) on update cascade,
+eid2 INT references Employee(eid) on update cascade
+);
+
+CREATE TABLE Customer (
+CustomerId INT PRIMARY KEY,
+Name varchar(20),
+BillingAddress varchar(20),
+CreditLimit int,
+OutstandingBalance INT,
+DiscountPercentage INT,
+YearToDatePurchaseTotal INT
+);
+
+CREATE TABLE CustomerOrder (
+orderId INT unique,
+Cdate date,
+quantity INT,
+status varchar(20),
+product INT references Product(productId) on update cascade,
+code INT references Product(code) on update cascade,
+customer INT references Customer(CustomerId) on update cascade,
+primary key(orderId,product, code)
+);
+
+CREATE TABLE Invoice (
+InvoiceId INT,
+paymentID integer,
+Amount integer,
+InvoiceAmount integer,
+InvoiceDate date,
+product INT references Product(productId) on update cascade,
+code INT references Product(code) on update cascade,
+cusOrder INT references CustomerOrder(orderId) on update cascade,
+customer INT references Customer(CustomerId) on update cascade,
+primary key(InvoiceId, cusOrder, product, code)
+);
